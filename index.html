@@ -2,26 +2,27 @@
 <html>
   <head>
     <title>Socket.IO chat</title>
-    <style>
-      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-
-      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-      #input:focus { outline: none; }
-      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
-
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages > li { padding: 0.5rem 1rem; }
-      #messages > li:nth-child(odd) { background: #efefef; }
-
-      
-    </style>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <style> #test-color{ color: blue}; </style>    
   </head>
+
   <body>
-    <div id="time">
+    <div id="my-section">
       <p id="server-time"></p>
       <p id="player-turn">Player turn = </p>
+
+      <form id="join" action="">
+        <input id="join-input" autocomplete="off" /><button>Join Room</button>
+      </form>
+      <button id="leave">leave room</button>
+
+      <div id="rooms">
+        <h2>my rooms</h2>
+      </div>
+
     </div>
+
+
     <ul id="messages"></ul>
     <form id="form" action="">
       <input id="input" autocomplete="off" /><button>Send</button>
@@ -31,6 +32,11 @@
     <script>
         var socket = io();
 
+        let myRooms = []
+
+        const rooms = document.getElementById("rooms");
+
+        //setting up chat feature
         var form = document.getElementById('form');
         var input = document.getElementById('input');
 
@@ -42,6 +48,68 @@
             }
         });
 
+        const chars = ["0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f"]
+        //function to add new colour-room
+        const newColourRoom = (roomName) => {
+          let newRoom = document.createElement('div');
+          newRoom.id = roomName;
+          newRoom.className = "room";
+          newRoom.textContent = roomName;
+
+          newRoom.addEventListener("click", () => {
+            let hexcode = "#";
+            for (let i = 0; i < 6; i++ )
+            {
+              const random = Math.floor(Math.random() * chars.length);
+              hexcode += chars[random]
+            }
+            // send this new colour to server
+            socket.emit('new colour', roomName, hexcode);
+          })
+          rooms.appendChild(newRoom);
+        }
+
+        // setting up rooms join
+        const join = document.getElementById('join');
+        const joinInput = document.getElementById('join-input');
+        const leave = document.getElementById('leave');
+
+        join.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (joinInput.value) {              
+              socket.emit('join room', joinInput.value);            
+               
+              if(myRooms.includes(joinInput.value) == false){
+                myRooms.push(joinInput.value)
+                newColourRoom(joinInput.value);
+              }
+              joinInput.value = '';  
+            }
+            console.log(`My rooms = ${myRooms}`)
+        });
+
+        leave.addEventListener("click", () => {
+          // leave socket 
+          console.log(`My rooms = ${myRooms}`)
+          if (myRooms.includes(joinInput.value)) {
+            socket.emit('leave room', joinInput.value);
+
+            const index = myRooms.indexOf(joinInput.value);
+            if (index > -1) {
+              myRooms.splice(index, 1); // 2nd parameter means remove one item only
+            }
+            const roomToDel = document.getElementById(joinInput.value);
+            rooms.removeChild(roomToDel);
+          }
+          console.log(`My rooms = ${myRooms}`)
+        })
+
+
+        socket.on('time', function(timeString) {
+            el = document.getElementById('server-time')
+            el.innerHTML = 'Server time: ' + timeString;
+        });
+
         socket.on('chat message', function(msg) {
             var item = document.createElement('li');
             item.textContent = msg;
@@ -49,10 +117,25 @@
             window.scrollTo(0, document.body.scrollHeight);
         });
 
-        socket.on('time', function(timeString) {
-            el = document.getElementById('server-time')
-            el.innerHTML = 'Server time: ' + timeString;
+        socket.on('user joined', function(newRoom) {
+          var item = document.createElement('li');
+            item.textContent = "A new user joined this room:" + newRoom;
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
         });
+
+        socket.on('user left', function() {
+          var item = document.createElement('li');
+            item.textContent = "A user left this room";
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('new colour', function(room, hexcode) {  
+          const findRoom = document.getElementById(room)
+          findRoom.style.backgroundColor = hexcode;
+          findRoom.textContent = room + " - " + hexcode;
+        })
 
     </script>
   </body>
